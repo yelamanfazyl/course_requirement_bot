@@ -1,0 +1,3 @@
+pdfplumber
+python-telegram-bot
+redis

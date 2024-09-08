@@ -1,0 +1,103 @@
+{
+  "CSCI": {
+    "core": {
+      "courses": [
+        ["MATH 161", ["BENG 124", "BENG 125"]],
+        ["PHYS 161", "BENG 117"],
+        ["CSCI 151", "ENG 101"],
+        "MATH 162",
+        "PHYS 162",
+        "CSCI 152",
+        "CSCI 231",
+        "CSCI 235",
+        "MATH 273",
+        "MATH 251",
+        "CSCI 272",
+        "CSCI 270",
+        "ROBT 206",
+        "MATH 321",
+        "CSCI 390",
+        "CSCI 341",
+        "CSCI 361",
+        "CSCI 333",
+        "CSCI 332",
+        "CSCI 307",
+        "CSCI 408",
+        "CSCI 409"
+      ],
+      "total_credits_required": 150
+    },
+    "technical": {
+      "courses": [
+        "CSCI\\s[2-9]\\d{2}[A-Z]?",
+        "MATH 351",
+        "MATH 417",
+        "PHYS 270",
+        "ROBT 205",
+        "ROBT 305",
+        "ROBT 310",
+        "ROBT 407",
+        "ROBT 414"
+      ],
+      "total_credits_required": 24
+    },
+    "natural": {
+      "courses": ["(PHYS|CHEM|BIOL|GEOL)\\s[1-9]\\d{2,}"],
+      "total_credits_required": 12
+    },
+    "social": {
+      "courses": ["(SOC|PLS|ANT|ECON|LING)\\s[1-9]\\d{2,}"],
+      "total_credits_required": 6
+    },
+    "hst": { "courses": ["HST 100"], "total_credits_required": 6 },
+    "kazakh": {
+      "Basic": {
+        "courses": ["KAZ 150", "KAZ 201", "KAZ 202"],
+        "total_credits_required": 18
+      },
+      "Intermediate": {
+        "courses": ["KAZ 201", "KAZ 202"],
+        "total_credits_required": 12
+      },
+      "Upper-intermediate": {
+        "courses": ["KAZ 202", ["KAZ 211", "KAZ 212", "(KAZ\\s3\\d{2})"]],
+        "total_credits_required": 12
+      },
+      "Advanced": {
+        "courses": [
+          "(KAZ\\s3\\d{2}|KAZ\\s4\\d{2})",
+          "(KAZ\\s3\\d{2}|KAZ\\s4\\d{2})"
+        ],
+        "total_credits_required": 12
+      }
+    },
+    "wcs": {
+      "courses": [
+        "WCS 150",
+        [
+          "WCS 200",
+          "WCS 202",
+          "WCS 220",
+          "WCS 210",
+          "WCS 230",
+          "WCS 240",
+          "WCS 250",
+          "WCS 260"
+        ]
+      ],
+      "total_credits_required": 12
+    },
+    "bus": {
+      "courses": ["BUS 101"],
+      "total_credits_required": 6
+    },
+    "ethics": {
+      "courses": [["PHIL 210", "PHIL 215"]],
+      "total_credits_required": 6
+    },
+    "open": {
+      "courses": [".*"],
+      "total_credits_required": 6
+    }
+  }
+}
