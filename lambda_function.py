@@ -2,7 +2,6 @@ import logging
 import os
 import json
 import asyncio
-import redis
 import pdfplumber
 import re
 import io
@@ -15,6 +14,9 @@ from telegram.ext import (
     ContextTypes,
 )
 from typing import List, Tuple, Set, Optional
+from pymongo import MongoClient
+import redis
+
 
 # Enable logging
 logger = logging.getLogger()
@@ -24,21 +26,33 @@ formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(messag
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-# Conversation states (using these constants to represent states in Redis)
+# Conversation states
 TRANSCRIPT = "TRANSCRIPT"
 KAZAKH_LEVEL = "KAZAKH_LEVEL"
 MAJOR = "MAJOR"
 kazakh_keyboard = [["Basic", "Intermediate", "Advanced"]]
 
+# MongoDB connection setup
+MONGODB_URL = os.getenv("MONGODB_URL")
 # Redis connection setup
 REDIS_HOST = os.getenv("REDIS_HOST")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
 
 try:
+    logger.info(f"Connecting to MongoDB at {MONGODB_URL}")
+    client = MongoClient(MONGODB_URL)
+    db = client["transcript_bot"]
+    users_collection = db["users"]
+    logger.info("Connected to MongoDB successfully.")
+except Exception as e:
+    logger.error(f"Failed to connect to MongoDB: {e}")
+    raise
+
+try:
     logger.info(f"Connecting to Redis at {REDIS_HOST}:{REDIS_PORT}")
-    r = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASSWORD)
-    r.ping()  # Test Redis connection
+    redis_cache = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASSWORD)
+    redis_cache.ping()  # Test Redis connection
     logger.info("Connected to Redis successfully.")
 except redis.RedisError as e:
     logger.error(f"Failed to connect to Redis: {e}")
@@ -81,29 +95,53 @@ def load_data():
 
 
 async def load_user_state(user_id: int) -> dict:
-    """Load the user state from Redis."""
-    logger.info(f"Fetching user state for user {user_id}")
+    """Load the user state from Redis cache, fallback to MongoDB if not found."""
+    logger.info(f"Fetching user state for user {user_id} from Redis cache")
+
+    # Try to fetch from Redis cache first
     try:
-        state = r.get(f"user_state:{user_id}")
-        if state:
-            logger.info(f"User state found for {user_id}")
-            return json.loads(state)
+        cached_state = redis_cache.get(f"user_state:{user_id}")
+        if cached_state:
+            logger.info(f"User state for {user_id} found in Redis cache")
+            return json.loads(cached_state)
+    except Exception as e:
+        logger.error(f"Error retrieving user state from Redis: {e}")
+
+    # If not in Redis, fallback to MongoDB
+    logger.info(f"Fetching user state for user {user_id} from MongoDB")
+    try:
+        user = users_collection.find_one({"user_id": user_id})
+        if user:
+            logger.info(f"User state found for {user_id} in MongoDB")
+            state = user.get("state", {})
+
+            # Store the state in Redis for future access
+            redis_cache.set(f"user_state:{user_id}", json.dumps(state))
+
+            return state
         else:
             logger.info(f"No state found for user {user_id}, initializing new state.")
             return {}
     except Exception as e:
-        logger.error(f"Error loading user state from Redis: {e}")
+        logger.error(f"Error loading user state from MongoDB: {e}")
         return {}
 
 
 async def save_user_state(user_id: int, state: dict):
-    """Save the user state to Redis."""
+    """Save the user state to MongoDB and cache in Redis."""
     logger.info(f"Saving user state for user {user_id}")
     try:
-        r.set(f"user_state:{user_id}", json.dumps(state))
-        logger.info(f"State for user {user_id} saved successfully")
+        # Save to MongoDB
+        users_collection.update_one(
+            {"user_id": user_id}, {"$set": {"state": state}}, upsert=True
+        )
+
+        # Cache the state in Redis
+        redis_cache.set(f"user_state:{user_id}", json.dumps(state))
+
+        logger.info(f"State for user {user_id} saved and cached successfully")
     except Exception as e:
-        logger.error(f"Error saving user state to Redis: {e}")
+        logger.error(f"Error saving user state to MongoDB or Redis: {e}")
 
 
 # Start Command - Only use ConversationHandler for starting the interaction
@@ -128,7 +166,7 @@ async def handle_transcript(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.message.from_user.id
     logger.info(f"User {update.message.from_user.username} uploaded a transcript.")
 
-    # Load the current state from Redis
+    # Load the current state from MongoDB
     state = await load_user_state(user_id)
 
     # Check if the user is in the correct state
@@ -186,7 +224,7 @@ async def handle_kazakh_level(update: Update, context: ContextTypes.DEFAULT_TYPE
     kazakh_level = update.message.text
     logger.info(f"User {user_id} selected Kazakh level: {kazakh_level}")
 
-    # Load the current state from Redis
+    # Load the current state from MongoDB
     state = await load_user_state(user_id)
 
     # Check if the user is in the correct state
@@ -229,7 +267,7 @@ async def handle_major(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     major = update.message.text
     logger.info(f"User {user_id} selected major: {major}")
 
-    # Load the current state from Redis
+    # Load the current state from MongoDB
     state = await load_user_state(user_id)
 
     # Check if the user is in the correct state
@@ -408,7 +446,7 @@ async def handle_text_input(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_input = update.message.text
     logger.info(f"User {user_id} provided input: {user_input}")
 
-    # Load the current state from Redis
+    # Load the current state from MongoDB
     state = await load_user_state(user_id)
 
     # Check if the user is in the Kazakh level state
